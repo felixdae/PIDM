@@ -561,13 +561,11 @@ class QKVAttentionLegacy(nn.Module):
         ch = width // (3 * self.n_heads)
         q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(ch,
                                                                        dim=1)
-        print("qkv shape, ch", q.size(), k.size(), v.size(), ch)
         scale = 1 / math.sqrt(math.sqrt(ch))
         weight = th.einsum(
             "bct,bcs->bts", q * scale,
             k * scale)  # More stable with f16 than dividing afterwards
         weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
-        print("qkv weight shape", weight.size())
         a = th.einsum("bts,bcs->bct", weight, v)
         return a.reshape(bs, -1, length)
 
