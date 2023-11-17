@@ -63,6 +63,13 @@ def fp16error():
     c = a+0.3-0.2
     print((b-c).abs().max())
 
+def fp32to16():
+    a = torch.tensor([1, 2, -1, 65503, 65504, 65504.1, 65504.5, 65505,
+                      65506, 66000, 67000, -65506, -66000]).to('cuda')
+    print(a)
+    print(a.half())
+
 if __name__ == '__main__':
     # main()
-    fp16error()
+    # fp16error()
+    fp32to16()
