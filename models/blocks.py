@@ -548,6 +548,11 @@ class QKVAttentionLegacy(nn.Module):
     def __init__(self, n_heads):
         super().__init__()
         self.n_heads = n_heads
+    
+    def check_outlier(self, val):
+        if val.abs().max() > 65504:
+            print("detect outlier outside float16", val.max(), val.min())
+
 
     def forward(self, qkv):
         """
@@ -559,6 +564,7 @@ class QKVAttentionLegacy(nn.Module):
         bs, width, length = qkv.shape
         assert width % (3 * self.n_heads) == 0
         ch = width // (3 * self.n_heads)
+        self.check_outlier(qkv)
         q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(ch,
                                                                        dim=1)
         scale = 1 / math.sqrt(math.sqrt(ch))
