@@ -117,10 +117,10 @@ if __name__ == "__main__":
 
     obj = Predictor()
 
-    obj.predict_pose(image='test.jpg', num_poses=4, sample_algorithm = 'ddim',  nsteps = 50)
+    # obj.predict_pose(image='test.jpg', num_poses=4, sample_algorithm = 'ddim',  nsteps = 50)
     
-    # ref_img = "data/deepfashion_256x256/target_edits/reference_img_0.png"
-    # ref_mask = "data/deepfashion_256x256/target_mask/lower/reference_mask_0.png"
-    # ref_pose = "data/deepfashion_256x256/target_pose/reference_pose_0.npy"
+    ref_img = "data/deepfashion_256x256/target_edits/reference_img_2.png"
+    ref_mask = "data/deepfashion_256x256/target_mask/lower/reference_mask_2.png"
+    ref_pose = "data/deepfashion_256x256/target_pose/reference_pose_5.npy"
 
-    # #obj.predict_appearance(image='test.jpg', ref_img = ref_img, ref_mask = ref_mask, ref_pose = ref_pose, sample_algorithm = 'ddim',  nsteps = 50)
+    obj.predict_appearance(image='test.jpg', ref_img = ref_img, ref_mask = ref_mask, ref_pose = ref_pose, sample_algorithm = 'ddim',  nsteps = 50)
