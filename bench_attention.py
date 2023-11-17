@@ -35,6 +35,12 @@ def flash(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor):
     ):
         return torch.nn.functional.scaled_dot_product_attention(q, k, v, scale=scale)
 
+def xformer(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor):
+    scale = 1 / math.sqrt(q.size(-1))
+    with torch.backends.cuda.sdp_kernel(
+        enable_flash=False, enable_math=False, enable_mem_efficient=True
+    ):
+        return torch.nn.functional.scaled_dot_product_attention(q, k, v, scale=scale)
 
 def main():
     shape = (5, 6, 7, 8)
@@ -45,9 +51,18 @@ def main():
     x = naive(q, k, v)
     y = cpp(q, k, v)
     z = flash(q, k, v)
+    u = xformer(q, k, v)
     print((y - z).abs().max())
     print((x - z).abs().max())
     print((x - y).abs().max())
+    print((x - u).abs().max())
+
+def fp16error():
+    a = torch.randn(10,10).half()
+    b = a-0.2+0.3
+    c = a+0.3-0.2
+    print((b-c).abs().max())
 
 if __name__ == '__main__':
-    main()
+    # main()
+    fp16error()
