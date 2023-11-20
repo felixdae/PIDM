@@ -43,7 +43,7 @@ def xformer(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor):
         return torch.nn.functional.scaled_dot_product_attention(q, k, v, scale=scale)
 
 def main():
-    shape = (5, 6, 7, 8)
+    shape = (5, 6, 7, 512)
     q = torch.randn(*shape).to('cuda')
     k = torch.randn(*shape).to('cuda')
     v = torch.randn(*shape).to('cuda')
@@ -71,5 +71,5 @@ def fp32to16():
 
 if __name__ == '__main__':
     # main()
-    # fp16error()
+    fp16error()
     fp32to16()
