@@ -121,6 +121,7 @@ if __name__ == "__main__":
     
     ref_img = "data/deepfashion_256x256/target_edits/reference_img_2.png"
     ref_mask = "data/deepfashion_256x256/target_mask/lower/reference_mask_2.png"
-    ref_pose = "data/deepfashion_256x256/target_pose/reference_pose_5.npy"
+    # ref_pose = "data/deepfashion_256x256/target_pose/reference_pose_5.npy"
+    ref_pose = "data/deepfashion_256x256/target_pose/reference_pose_2.npy"
 
     obj.predict_appearance(image='test.jpg', ref_img = ref_img, ref_mask = ref_mask, ref_pose = ref_pose, sample_algorithm = 'ddim',  nsteps = 50)

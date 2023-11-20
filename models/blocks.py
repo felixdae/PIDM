@@ -11,7 +11,7 @@ from torch import nn
 
 from .nn import (avg_pool_nd, conv_nd, linear, normalization,
                  timestep_embedding, torch_checkpoint, zero_module)
-
+from xformers.ops import memory_efficient_attention
 
 class ScaleAt(Enum):
     after_norm = 'afternorm'
@@ -549,11 +549,6 @@ class QKVAttentionLegacy(nn.Module):
         super().__init__()
         self.n_heads = n_heads
     
-    def check_outlier(self, val):
-        if val.abs().max() > 65504:
-            print("detect outlier outside float16", val.max(), val.min())
-
-
     def forward(self, qkv):
         """
         Apply QKV attention.
@@ -564,16 +559,31 @@ class QKVAttentionLegacy(nn.Module):
         bs, width, length = qkv.shape
         assert width % (3 * self.n_heads) == 0
         ch = width // (3 * self.n_heads)
-        self.check_outlier(qkv)
-        q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(ch,
-                                                                       dim=1)
+        q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(
+            ch, dim=1)
+        # out1= self.official_attention(q, k, v, ch)
+        out = self.xformers_attention(q, k, v, ch)
+        # assert (out1-out).abs().max() < 1e-4
+        # if (out1-out).abs().max() > 1e-4:
+        # print(f"{(out1-out).abs().max()}")
+        return out.reshape(bs, -1, length)
+    
+    def official_attention(self,q:th.Tensor,k:th.Tensor,v:th.Tensor,ch:int):
         scale = 1 / math.sqrt(math.sqrt(ch))
         weight = th.einsum(
             "bct,bcs->bts", q * scale,
             k * scale)  # More stable with f16 than dividing afterwards
         weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
         a = th.einsum("bts,bcs->bct", weight, v)
-        return a.reshape(bs, -1, length)
+        return a
+
+    def xformers_attention(self, q:th.Tensor, k:th.Tensor, v:th.Tensor, ch:int):
+        scale = 1 / math.sqrt(ch)
+        q = q.unsqueeze(0).transpose(-1, -2).transpose(-2,-3).contiguous()
+        k = k.unsqueeze(0).transpose(-1, -2).transpose(-2,-3).contiguous()
+        v = v.unsqueeze(0).transpose(-1, -2).transpose(-2,-3).contiguous()
+        out = memory_efficient_attention(q,k,v,scale=scale).transpose(-2,-3).transpose(-2,-1).squeeze(0)
+        return out
 
     @staticmethod
     def count_flops(model, _x, y):

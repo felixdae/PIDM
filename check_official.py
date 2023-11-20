@@ -1,5 +1,7 @@
 import math
 import torch as th
+import numpy as np
+from xformers.ops import memory_efficient_attention
 
 def gold(q:th.Tensor, k:th.Tensor, v:th.Tensor, ch:int):
     print("qkv shape", q.size(), k.size(), v.size())
@@ -12,21 +14,32 @@ def gold(q:th.Tensor, k:th.Tensor, v:th.Tensor, ch:int):
     a = th.einsum("bts,bcs->bct", weight, v)
     return a
 
-def official(q:th.Tensor, k:th.Tensor, v:th.Tensor, ch:int):
-    # print(q.size(),k.size(),v.size())
+def xformers(q:th.Tensor, k:th.Tensor, v:th.Tensor, ch:int):
     scale = 1 / math.sqrt(ch)
-    return th.nn.functional.scaled_dot_product_attention(q,k,v,scale=scale)
+    return memory_efficient_attention(q,k,v,scale=scale)
+
+
+def relative_error(a:th.Tensor, b:th.Tensor):
+    indcies = th.argmax((a-b).abs())
+    max_index = np.unravel_index(indcies.cpu().numpy(), shape=a.size())
+    v1 = a[max_index]
+    v2 = b[max_index]
+    return 2*(v1-v2).abs()/(v1.abs()+v2.abs())
 
 if __name__ == '__main__':
     shape = [16, 256, 1024]
-    q = th.randn(shape)
-    k = th.randn(shape)
-    v = th.randn(shape)
+    q = th.randn(shape).cuda()
+    k = th.randn(shape).cuda()
+    v = th.randn(shape).cuda()
 
-    ch = 256
+    ch = shape[-2]
     a = gold(q,k,v,ch)
-    b = official(q.transpose(-2,-1),k.transpose(-2,-1),v.transpose(-2,-1),ch).transpose(-2,-1)
+    b = xformers(q.unsqueeze(0).transpose(-2,-1).transpose(-2,-3).contiguous(),
+                 k.unsqueeze(0).transpose(-2,-1).transpose(-2,-3).contiguous(),
+                 v.unsqueeze(0).transpose(-2,-1).transpose(-2,-3).contiguous(),
+                 ch).transpose(-2,-3).transpose(-2,-1).squeeze(0)
+    print(a.dtype, b.dtype)
 
     print(a.size(), a[0,0,:5])
     print(b.size(), b[0,0,:5])
-    print(th.max(th.abs(a-b)))
+    print(relative_error(a,b))
