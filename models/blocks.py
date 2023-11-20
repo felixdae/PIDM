@@ -579,10 +579,10 @@ class QKVAttentionLegacy(nn.Module):
 
     def xformers_attention(self, q:th.Tensor, k:th.Tensor, v:th.Tensor, ch:int):
         scale = 1 / math.sqrt(ch)
-        q = q.unsqueeze(0).transpose(-1, -2).transpose(-2,-3).contiguous()
-        k = k.unsqueeze(0).transpose(-1, -2).transpose(-2,-3).contiguous()
-        v = v.unsqueeze(0).transpose(-1, -2).transpose(-2,-3).contiguous()
-        out = memory_efficient_attention(q,k,v,scale=scale).transpose(-2,-3).transpose(-2,-1).squeeze(0)
+        q = q.transpose(-1, -2).contiguous()
+        k = k.transpose(-1, -2).contiguous()
+        v = v.transpose(-1, -2).contiguous()
+        out = memory_efficient_attention(q,k,v,scale=scale).transpose(-2,-1)
         return out
 
     @staticmethod
