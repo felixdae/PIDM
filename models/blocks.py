@@ -561,7 +561,7 @@ class QKVAttentionLegacy(nn.Module):
         ch = width // (3 * self.n_heads)
         q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(
             ch, dim=1)
-        # out1= self.official_attention(q, k, v, ch)
+        # out = self.official_attention(q, k, v, ch)
         out = self.xformers_attention(q, k, v, ch)
         # assert (out1-out).abs().max() < 1e-4
         # if (out1-out).abs().max() > 1e-4:
