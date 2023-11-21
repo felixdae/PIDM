@@ -63,25 +63,24 @@ def prepare_data(root, dataset, out, n_worker, sizes, chunksize):
     total = len(filenames)
     os.makedirs(out, exist_ok=True)
 
-    for size in sizes:
-        lmdb_path = os.path.join(out, str('-'.join([str(item) for item in size])))
-        with lmdb.open(lmdb_path, map_size=1024 ** 4, readahead=False) as env:
-            with env.begin(write=True) as txn:
-                txn.put(format_for_lmdb('length'), format_for_lmdb(total))
-                resizer = Resizer(size=size, root=root)
-                with multiprocessing.Pool(n_worker) as pool:
-                    for idx, result_img, filename in tqdm(
-                            pool.imap_unordered(resizer, enumerate(filenames), chunksize=chunksize),
-                            total=total):
-                        filename = os.path.splitext(filename)[0] + '.png'
-                        txn.put(format_for_lmdb(filename), result_img)
+    lmdb_path = os.path.join(out, str('-'.join([str(item) for item in sizes])))
+    with lmdb.open(lmdb_path, map_size=1024 ** 4, readahead=False) as env:
+        with env.begin(write=True) as txn:
+            txn.put(format_for_lmdb('length'), format_for_lmdb(total))
+            resizer = Resizer(size=sizes, root=root)
+            with multiprocessing.Pool(n_worker) as pool:
+                for idx, result_img, filename in tqdm(
+                        pool.imap_unordered(resizer, enumerate(filenames), chunksize=chunksize),
+                        total=total):
+                    filename = os.path.splitext(filename)[0] + '.png'
+                    txn.put(format_for_lmdb(filename), result_img)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--root', type=str, help='a path to output directory')
     parser.add_argument('--dataset', type=str, default='deepfashion', help='a path to output directory')
     parser.add_argument('--out', type=str, help='a path to output directory')
-    parser.add_argument('--sizes', type=int, nargs='+', default=((256, 256),) )
+    parser.add_argument('--sizes', type=int, nargs='+') # 256 256
     parser.add_argument('--n_worker', type=int, help='number of worker processes', default=8)
     parser.add_argument('--chunksize', type=int, help='approximate chunksize for each worker', default=10)
     args = parser.parse_args()

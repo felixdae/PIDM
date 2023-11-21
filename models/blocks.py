@@ -582,7 +582,7 @@ class QKVAttentionLegacy(nn.Module):
         q = q.transpose(-1, -2).contiguous()
         k = k.transpose(-1, -2).contiguous()
         v = v.transpose(-1, -2).contiguous()
-        out = memory_efficient_attention(q,k,v,scale=scale).transpose(-2,-1)
+        out = memory_efficient_attention(q, k, v, scale=scale).transpose(-2, -1)
         return out
 
     @staticmethod
