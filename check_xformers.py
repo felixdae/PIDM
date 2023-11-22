@@ -5,19 +5,23 @@ from torch.utils import benchmark
 from xformers.ops import memory_efficient_attention
 
 def gold(q:th.Tensor, k:th.Tensor, v:th.Tensor, ch:int):
-    # print("qkv shape", q.size(), k.size(), v.size())
     scale = 1 / math.sqrt(math.sqrt(ch))
-    weight = th.einsum(
-        "bct,bcs->bts", q * scale,
-        k * scale)  # More stable with f16 than dividing afterwards
+    weight = th.einsum("bct,bcs->bts", q * scale, k * scale)  # More stable with f16 than dividing afterwards
     weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
-    # print("qkv weight shape", weight.size())
-    a = th.einsum("bts,bcs->bct", weight, v)
-    return a
+    out = th.einsum("bts,bcs->bct", weight, v)
+    return out
 
 def xformers(q:th.Tensor, k:th.Tensor, v:th.Tensor, ch:int):
     scale = 1 / math.sqrt(ch)
     return memory_efficient_attention(q,k,v,scale=scale)
+
+def xformers_axis_switch(q:th.Tensor, k:th.Tensor, v:th.Tensor, ch:int):
+    q = q.permute(0,2,1).contiguous()
+    k = k.permute(0,2,1).contiguous()
+    v = v.permute(0,2,1).contiguous()
+    scale = 1 / math.sqrt(ch)
+    out = memory_efficient_attention(q,k,v,scale=scale)
+    return out.permute(0,2,1)
 
 
 def relative_error(a:th.Tensor, b:th.Tensor):
@@ -28,6 +32,7 @@ def relative_error(a:th.Tensor, b:th.Tensor):
     return 2*(v1-v2).abs()/(v1.abs()+v2.abs())
 
 def profile_model(fn, min_run_time=5):
+    # https://github.com/facebookresearch/xformers/issues/678
     th.cuda.reset_peak_memory_stats()
     th.cuda.synchronize()
     res = benchmark.Timer(
@@ -43,28 +48,38 @@ def profile_model(fn, min_run_time=5):
     print(res)
     print(memory)
 
-def do_profile():
+def do_profile(dtype):
+    print(f"###### profile with dtype {dtype}")
     shape = [64, 256, 1024]
     ch = shape[-2]
-    q = th.randn(shape).cuda()
-    k = th.randn(shape).cuda()
-    v = th.randn(shape).cuda()
+    q = th.randn(shape).cuda().to(dtype)
+    k = th.randn(shape).cuda().to(dtype)
+    v = th.randn(shape).cuda().to(dtype)
+    
     print("-"*100)
+    print("official:")
     with th.no_grad():
         profile_model(lambda: gold(q,k,v,ch))
 
     print("-"*100)
+    print("with axis switch:")
     with th.no_grad():
-        profile_model(lambda: xformers(q.transpose(-2,-1).contiguous(),
-                 k.transpose(-2,-1).contiguous(),
-                 v.transpose(-2,-1).contiguous(),
-                 ch).transpose(-2,-1))
+        profile_model(lambda: xformers_axis_switch(q,k,v,ch))
+    
+    print("-"*100)
+    print("without axis switch:")
+    q = q.permute(0,2,1).contiguous()
+    k = k.permute(0,2,1).contiguous()
+    v = v.permute(0,2,1).contiguous()
+    with th.no_grad():
+        profile_model(lambda: xformers(q,k,v,ch))
 
-def main():
+def check_error(dtype):
+    print(f"###### check error with dtype {dtype}")
     shape = [16, 256, 1024]
-    q = th.randn(shape).cuda()
-    k = th.randn(shape).cuda()
-    v = th.randn(shape).cuda()
+    q = th.randn(shape).cuda().to(dtype)
+    k = th.randn(shape).cuda().to(dtype)
+    v = th.randn(shape).cuda().to(dtype)
 
     ch = shape[-2]
     a = gold(q,k,v,ch)
@@ -74,10 +89,10 @@ def main():
                  ch).transpose(-2,-1)
     print(a.dtype, b.dtype)
 
-    print(a.size(), a[0,0,:5])
-    print(b.size(), b[0,0,:5])
-    print(relative_error(a,b))
+    print(f"relative error: {relative_error(a,b):.6f}")
 
 if __name__ == '__main__':
-    # main()
-    do_profile()
+    # check_error(th.float32)
+    # check_error(th.float16)
+    do_profile(th.float32)
+    do_profile(th.float16)
